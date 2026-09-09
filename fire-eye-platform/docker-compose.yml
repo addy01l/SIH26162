@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  database:
+    build: 
+      context: ./database
+    container_name: fire-eye-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: fireeye
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: fire-eye-redis
+    ports:
+      - "6379:6379"
+
+  data-ingestion:
+    build:
+      context: ./data-ingestion
+    container_name: fire-eye-ingestion
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://user:password@database:5432/fireeye
+      - FIRMS_API_KEY=${FIRMS_API_KEY:-DEMO_KEY}
+    depends_on:
+      - database
+      - redis
+    restart: always
+
+  ml-engine:
+    build:
+      context: ./ml-engine
+    container_name: fire-eye-ml
+    # Typically this might run as a one-off job or separate API.
+    # We will just run it and let it exit once training finishes.
+    # In a real cluster we'd map volumes to share models.
+    volumes:
+      - ./ml-engine/models:/app/models
+
+  backend-api:
+    build:
+      context: ./backend-api
+    container_name: fire-eye-backend
+    environment:
+      - DATABASE_URL=postgresql://user:password@database:5432/fireeye
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+
+  frontend-dashboard:
+    build:
+      context: ../frontend
+    container_name: fire-eye-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-api
+
+volumes:
+  db_data:
