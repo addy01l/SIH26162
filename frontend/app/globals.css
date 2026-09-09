@@ -196,4 +196,31 @@
     );
     mix-blend-mode: overlay;
   }
+
+  /* Subtle pulsing fire indicator */
+  @keyframes fire-pulse {
+    0%, 100% { box-shadow: 0 0 4px oklch(0.55 0.21 20 / 0%); }
+    50% { box-shadow: 0 0 12px oklch(0.55 0.21 20 / 40%); }
+  }
+  .fire-pulse {
+    animation: fire-pulse 2s ease-in-out infinite;
+  }
+
+  /* Smooth glass panel styling */
+  .glass-panel {
+    background: oklch(0.08 0.01 240 / 55%);
+    backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid oklch(1 0 0 / 8%);
+  }
+
+  /* Vignette overlay for the entire viewport */
+  .vignette::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    background: radial-gradient(ellipse at center, transparent 50%, oklch(0.02 0.01 240 / 45%) 100%);
+  }
 }
+

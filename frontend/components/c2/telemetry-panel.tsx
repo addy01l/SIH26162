@@ -1,6 +1,6 @@
 "use client"
 
-import { Flame, ListTree } from "lucide-react"
+import { Flame, ListTree, Factory } from "lucide-react"
 import { cn } from "cn"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -19,11 +19,17 @@ function formatCoord(lat: number, lng: number) {
   return `${latStr} / ${lngStr}`
 }
 
+const severityColor: Record<string, string> = {
+  High: "text-red-400",
+  Medium: "text-amber-400",
+  Low: "text-emerald-400",
+}
+
 export function TelemetryPanel({ selectedId, onSelect }: TelemetryPanelProps) {
   const fireCount = thermalEvents.filter((d) => d.classification === "Fire").length
 
   return (
-    <aside className="pointer-events-auto absolute left-4 top-20 bottom-4 z-10 flex w-[350px] flex-col overflow-hidden rounded-sm border border-border/60 bg-slate-950/60 backdrop-blur-md">
+    <aside className="pointer-events-auto absolute left-4 top-20 bottom-4 z-10 flex w-[350px] flex-col overflow-hidden rounded-sm glass-panel">
       <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <ListTree className="size-4 text-primary" strokeWidth={1.75} />
@@ -31,7 +37,7 @@ export function TelemetryPanel({ selectedId, onSelect }: TelemetryPanelProps) {
             Active Thermal Events
           </h2>
         </div>
-        <Badge variant="destructive" className="font-mono">
+        <Badge variant="destructive" className="font-mono fire-pulse">
           <Flame data-icon="inline-start" />
           {fireCount} active
         </Badge>
@@ -48,7 +54,7 @@ export function TelemetryPanel({ selectedId, onSelect }: TelemetryPanelProps) {
                   onClick={() => onSelect(d)}
                   className={cn(
                     "w-full px-4 py-3 text-left transition-colors hover:bg-accent/40",
-                    isSelected && "bg-accent/60"
+                    isSelected && "bg-accent/60 border-l-2 border-l-primary"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -58,7 +64,7 @@ export function TelemetryPanel({ selectedId, onSelect }: TelemetryPanelProps) {
                     <Badge
                       variant={d.classification === "Fire" ? "destructive" : "outline"}
                       className={cn(
-                        "font-mono uppercase",
+                        "font-mono uppercase text-[10px]",
                         d.classification === "Routine Flare" && "border-primary/40 text-primary",
                         d.classification === "Shutdown" && "border-amber-500/40 text-amber-500"
                       )}
@@ -70,13 +76,26 @@ export function TelemetryPanel({ selectedId, onSelect }: TelemetryPanelProps) {
                     <span className="font-mono text-sm text-foreground">
                       {formatCoord(d.lat, d.lng)}
                     </span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{d.id}</span>
+                    <span className={cn("font-mono text-[10px] font-semibold uppercase", severityColor[d.severity])}>
+                      {d.severity}
+                    </span>
                   </div>
-                  <span className="mt-1 block font-mono text-[10px] text-muted-foreground/70">
-                    {d.source}
-                  </span>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Factory className="size-3 text-muted-foreground/60" strokeWidth={1.5} />
+                    <span className="font-mono text-[10px] text-muted-foreground/80 truncate">
+                      {d.industrialSite}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-muted-foreground/60">
+                      {d.source}
+                    </span>
+                    <span className="font-mono text-[10px] text-muted-foreground/50">
+                      {d.id} · FRP {d.frp}MW
+                    </span>
+                  </div>
                 </button>
-                {idx < thermalEvents.length - 1 && <Separator className="opacity-60" />}
+                {idx < thermalEvents.length - 1 && <Separator className="opacity-40" />}
               </li>
             )
           })}

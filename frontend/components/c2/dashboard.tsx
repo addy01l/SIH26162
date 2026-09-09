@@ -13,7 +13,7 @@ export function Dashboard() {
   const [drawerOpen, setDrawerOpen] = useState(true)
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-transparent">
+    <div className="relative h-screen w-screen overflow-hidden bg-transparent vignette">
       {/* <TacticalMapDynamic /> */}
       <TopNav />
       <TelemetryPanel selectedId={selected?.id ?? null} onSelect={setSelected} />

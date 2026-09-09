@@ -35,7 +35,7 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
 
       <aside
         className={cn(
-          "pointer-events-auto absolute right-4 top-20 bottom-4 z-10 flex w-[350px] flex-col overflow-hidden rounded-sm border border-border/60 bg-card/40 backdrop-blur-xl transition-transform duration-300",
+          "pointer-events-auto absolute right-4 top-20 bottom-4 z-10 flex w-[350px] flex-col overflow-hidden rounded-sm glass-panel transition-transform duration-300",
           open ? "translate-x-0" : "translate-x-[calc(100%+1rem)]"
         )}
       >

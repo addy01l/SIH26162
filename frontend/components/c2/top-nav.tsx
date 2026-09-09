@@ -32,7 +32,7 @@ export function TopNav() {
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 p-4">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-sm border border-border/60 bg-slate-950/60 px-4 py-2 backdrop-blur-md">
+      <div className="pointer-events-auto flex items-center gap-3 rounded-sm glass-panel px-4 py-2">
         <ShieldAlert className="size-5 text-primary" strokeWidth={1.75} />
         <div className="flex flex-col leading-none">
           <span className="font-mono text-sm font-semibold tracking-wide text-foreground">

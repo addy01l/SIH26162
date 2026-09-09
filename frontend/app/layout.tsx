@@ -1,14 +1,15 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
 const _inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
+const _mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'AEGIS-7 // Tactical Command & Control',
-  description: 'Real-time wildfire detection and tactical monitoring dashboard',
-  generator: 'v0.app',
+  title: 'FIRE-EYE — Industrial Fire & Thermal Anomaly Monitoring',
+  description: 'AI-based detection and classification of industrial fires and persistent thermal sources using NASA FIRMS, OSM & satellite data.',
+  generator: 'FIRE-EYE / SIH26162',
   icons: {
     icon: [
       {
@@ -42,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`dark bg-transparent ${_inter.variable}`}>
+    <html lang="en" className={`dark bg-transparent ${_inter.variable} ${_mono.variable}`}>
       <body className="antialiased font-sans bg-transparent">
         <div className="fixed inset-0 -z-50 bg-[#02040a]">
           <EarthBackgroundDynamic />
