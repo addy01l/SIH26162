@@ -1,15 +1,15 @@
 import os
-import csv
 import io
-import requests
-import psycopg2
-import h3
 import logging
+import requests
+import pandas as pd
+import psycopg2
 from celery_app import app
 
 logger = logging.getLogger(__name__)
 
-FIRMS_API_KEY = os.getenv("FIRMS_API_KEY", "DEMO_KEY")
+# Use the specific MAP_KEY provided or fall back to an environment variable
+FIRMS_API_KEY = os.getenv("FIRMS_API_KEY", "338fc0eb481c2cdedbd695c560df857f")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@database:5432/fireeye")
 
 def get_db_connection():
@@ -19,74 +19,78 @@ def get_db_connection():
 def fetch_firms_data():
     """
     Fetches NASA FIRMS Near Real-Time (NRT) thermal anomalies data,
-    processes H3 indexing, and inserts into PostGIS.
+    processes it using pandas, and inserts into PostGIS.
     """
-    logger.info("Starting FIRMS data ingestion task...")
+    logger.info("Starting FIRMS data ingestion task for India...")
     
-    # We'll use VIIRS SNPP (source: VIIRS_SNPP_NRT) as an example
-    # Area format: World (-180,-90,180,90) or a specific bounding box
-    # Using 'world' for 1 day
-    source = "VIIRS_SNPP_NRT"
-    area = "world"
+    # Target sensor: VIIRS_NOAA20_NRT (375m high-resolution)
+    source = "VIIRS_NOAA20_NRT"
+    
+    # India bounding box (68,6,97,37)
+    area = "68,6,97,37"
+    
+    # Last 24 hours (1 day)
     day_range = 1
     
-    # Check if we're running without a real key
-    if FIRMS_API_KEY == "DEMO_KEY":
-        logger.warning("Using DEMO_KEY. NASA FIRMS API requires a valid MAP_KEY. "
-                       "Skipping real fetch to avoid API errors.")
-        return "Skipped fetch (No API Key)"
-        
+    # API URL structure
     url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{FIRMS_API_KEY}/{source}/{area}/{day_range}"
     
     try:
+        logger.info(f"Fetching data from FIRMS API: {url.replace(FIRMS_API_KEY, '***')}")
         response = requests.get(url, timeout=30)
         response.raise_for_status()
         
-        # Parse CSV
-        csv_data = response.text
-        reader = csv.DictReader(io.StringIO(csv_data))
+        # Use pandas to read the CSV data
+        df = pd.read_csv(io.StringIO(response.text))
+        
+        if df.empty:
+            logger.info("No new thermal anomalies found in the requested region.")
+            return "No data"
+            
+        # Extract the required columns
+        columns_to_extract = ['latitude', 'longitude', 'bright_ti4', 'frp', 'confidence']
+        
+        # Verify columns exist in the response
+        missing_cols = [col for col in columns_to_extract if col not in df.columns]
+        if missing_cols:
+            logger.error(f"Missing expected columns in FIRMS response: {missing_cols}")
+            return f"Error: Missing columns {missing_cols}"
+            
+        df = df[columns_to_extract]
+        
+        # Filter out rows with invalid coordinates
+        df = df.dropna(subset=['latitude', 'longitude'])
         
         records_to_insert = []
-        for row in reader:
-            lat = float(row['latitude'])
-            lng = float(row['longitude'])
+        for index, row in df.iterrows():
+            lat = row['latitude']
+            lng = row['longitude']
+            bright_ti4 = row['bright_ti4']
+            frp = row['frp']
+            confidence = str(row['confidence'])
             
-            # Calculate H3 index at resolution 8
-            h3_idx = h3.geo_to_h3(lat, lng, 8)
+            # Construct PostGIS Point Geometry in EWKT format (SRID=4326;POINT(lon lat))
+            geom = f"SRID=4326;POINT({lng} {lat})"
             
             records_to_insert.append((
                 lat,
                 lng,
-                float(row.get('brightness', 0)) if row.get('brightness') else None,
-                float(row.get('scan', 0)) if row.get('scan') else None,
-                float(row.get('track', 0)) if row.get('track') else None,
-                row['acq_date'],
-                row['acq_time'],
-                row.get('satellite', ''),
-                row.get('instrument', ''),
-                row.get('confidence', ''),
-                row.get('version', ''),
-                float(row.get('bright_t31', 0)) if row.get('bright_t31') else None,
-                float(row.get('frp', 0)) if row.get('frp') else None,
-                row.get('daynight', ''),
-                # PostGIS geometry uses EWKT: SRID=4326;POINT(lon lat)
-                f"SRID=4326;POINT({lng} {lat})",
-                h3_idx
+                bright_ti4 if not pd.isna(bright_ti4) else None,
+                frp if not pd.isna(frp) else None,
+                confidence if confidence != 'nan' else None,
+                geom
             ))
             
         if not records_to_insert:
-            logger.info("No new thermal anomalies found.")
-            return "No data"
+            logger.info("No valid records found to insert.")
+            return "No valid data"
             
         # Bulk insert into PostgreSQL
         insert_query = """
-            INSERT INTO thermal_anomalies (
-                latitude, longitude, brightness, scan, track, acq_date, acq_time,
-                satellite, instrument, confidence, version, bright_t31, frp, daynight,
-                geom, h3_index
+            INSERT INTO firms_detections (
+                latitude, longitude, bright_ti4, frp, confidence, geom
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                ST_GeomFromEWKT(%s), %s
+                %s, %s, %s, %s, %s, ST_GeomFromEWKT(%s)
             )
         """
         
@@ -98,6 +102,9 @@ def fetch_firms_data():
         logger.info(f"Successfully inserted {len(records_to_insert)} thermal anomalies.")
         return f"Inserted {len(records_to_insert)} records."
         
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching FIRMS data: {e}")
+        raise
     except Exception as e:
-        logger.error(f"Error fetching/inserting FIRMS data: {e}")
+        logger.error(f"Error processing/inserting FIRMS data: {e}")
         raise

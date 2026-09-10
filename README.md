@@ -17,32 +17,40 @@ We take near-real-time satellite thermal data (like VIIRS and MODIS via NASA FIR
 
 Instead of alerting responders to every single heat source, FIRE-EYE cuts through the noise. We tell you exactly where the fire is, what industrial site is affected, and whether it's actually an emergency.
 
-## 🚀 How It Works (The Pipeline)
+## 🚀 Data Flow & Architecture
 
-1. **Ingestion (NASA FIRMS):** We constantly pull live thermal telemetry from satellites passing overhead. 
-2. **Context (OSM & PostGIS):** When a hotspot is detected, we instantly map its coordinates against industrial polygons (like factories, power plants, and refineries) to see exactly what's burning.
-3. **AI Classification Engine:** We push the event data through our XGBoost and Isolation Forest models. By comparing the thermal signature against historical baselines, we classify the event as a **Routine Flare**, a harmless **Shutdown**, or an actual **Fire**.
-4. **Validation (Sentinel-2):** If it's a Fire, we don't just guess. We query Sentinel-2 optical and Short-Wave Infrared (SWIR) imagery to visually validate the fire core.
-5. **Alerting (Tactical GIS Dashboard):** All of this enriched intelligence is beamed to our web-based command dashboard, giving operators the exact information they need to dispatch ground verification.
+FIRE-EYE operates on a near-real-time (NRT) geospatial event-driven pipeline, splitting workloads between a lightweight Next.js edge and a heavy Python/PostGIS processing backend.
+
+### 1. Ingestion Layer (Next.js Edge)
+- **Global Polling:** The React dashboard (`/frontend`) maintains a 30-second silent polling cycle against our Next.js API route (`app/api/firms/route.ts`).
+- **NASA FIRMS Uplink:** The Next.js API queries NASA's global VIIRS 375m NRT thermal footprint, fetching telemetry across the last 12-hour sliding window.
+- **Initial Heuristics:** The server computes instant, heuristic-based classifications (e.g. Fire Radiative Power (FRP) > 15 MW or Brightness > 360 K flags a potential severe anomaly).
+- **Asynchronous ML Logging:** While the API resolves immediately to the UI for zero-latency dashboard updates, a background Node.js thread writes every unique raw thermal record to a local CSV (`data/ml_training_log.csv`). This decouples live monitoring from ML data harvesting.
+
+### 2. Analytical & Geospatial Layer (FastAPI + PostGIS)
+- **Data Broker:** The FastAPI backend (running on port 8000 via a Next.js proxy) acts as the bridge to our heavy geospatial models.
+- **Spatial Intersections (PostGIS):** Live thermal coordinates are injected into PostgreSQL. We run optimized `ST_Intersects` queries against OpenStreetMap (OSM) polygons (loaded in `osm_industrial`) to identify exactly what physical infrastructure is radiating heat.
+- **AI Classification Engine:** The historical telemetry logged by Next.js is consumed by Python ML models (XGBoost & Isolation Forest). By comparing the live thermal signature and spatial context against historical baseline norms, the engine accurately scores the event as a **Routine Flare**, a harmless **Shutdown**, or an actual **Emergency Fire**.
+
+### 3. Validation & C2 Layer (Sentinel-2 + UI)
+- **Optical Validation:** High-confidence emergencies trigger a request for Copernicus Sentinel-2 Short-Wave Infrared (SWIR) imagery to visually validate the fire core without ground deployment.
+- **Command & Control (C2) Dashboard:** Operators see a pulsing, 60 FPS 3D globe (MapLibre + Three.js) that auto-highlights the newest, most severe anomalies in neon red, allowing for immediate tactical dispatch.
 
 ## 🛠️ Tech Stack
 
-We built FIRE-EYE using robust, industry-standard tools for geospatial processing and modern web development:
-
-* **Frontend:** React, Next.js, Tailwind CSS, MapLibre GL, and Three.js for interactive mapping and data visualization.
-* **Backend:** Node.js / Express API.
-* **Database & Geospatial Engine:** PostgreSQL with the PostGIS extension for lightning-fast spatial queries.
-* **Machine Learning:** Python, XGBoost, and scikit-learn (Isolation Forest) for classification.
-* **Data Sources:** NASA FIRMS (VIIRS/MODIS), OpenStreetMap (Overpass API / Geofabrik), and Copernicus (Sentinel-2).
+* **Frontend:** Next.js (App Router), React, Tailwind CSS, shadcn/ui, MapLibre GL, Three.js.
+* **Backend:** FastAPI (Python), Next.js Serverless Routes (Node.js).
+* **Database / Geospatial:** PostgreSQL + PostGIS extension.
+* **Machine Learning:** Python, XGBoost, scikit-learn (Isolation Forest).
+* **Data Sources:** NASA FIRMS (VIIRS), OpenStreetMap (Geofabrik), Copernicus (Sentinel-2).
 
 ## 📂 Project Structure
 
-* `/frontend` - The Next.js tactical C2 dashboard (includes interactive maps and event telemetry panels).
-* `/fire-eye-platform` - Contains our backend infrastructure, including:
-  * `/backend-api` - Node.js API serving event data to the dashboard.
-  * `/data-ingestion` - Python scripts handling the FIRMS data pipeline and machine learning models.
-* `ARCHITECTURE.md` - Deep dive into our system architecture and data flows.
-* `WORKFLOW.md` - Detailed explanation of the 5-step classification pipeline.
+* `/frontend` - The Next.js tactical C2 dashboard and NASA FIRMS API ingestion routes.
+* `/fire-eye-platform` - Heavy infrastructure layer:
+  * `/backend-api` - FastAPI services bridging PostGIS and the ML pipeline.
+  * `/database` - SQL init scripts (`init.sql`) for PostGIS geometries and ST_Intersects logic.
+  * `/data-ingestion` - Python Celery workers and legacy ingestion scripts.
 
 ## 💡 Why This Matters
 

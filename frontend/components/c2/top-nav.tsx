@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, Satellite, ShieldAlert, Radio, GitMerge } from "lucide-react"
+import { Activity, Satellite, ShieldAlert, Radio, GitMerge, Target, Filter } from "lucide-react"
 import { KpiCard } from "./kpi-card"
+import type { SummaryMetrics } from "@/lib/c2-data"
 
-const OVERPASS_INTERVAL_SECONDS = 96 * 60 // ~1h36m orbital revisit window
+const NOAA20_ORBIT_SECONDS = 101 * 60
 
 function formatCountdown(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60)
@@ -13,17 +14,17 @@ function formatCountdown(totalSeconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
-export function TopNav() {
-  const [secondsLeft, setSecondsLeft] = useState(OVERPASS_INTERVAL_SECONDS - 1847)
-  const [activeEvents, setActiveEvents] = useState(8)
-  const [sitesMonitored, setSitesMonitored] = useState(12450)
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+export function TopNav({ summary }: { summary: SummaryMetrics | null }) {
+  const [secondsLeft, setSecondsLeft] = useState(NOAA20_ORBIT_SECONDS - 2530)
 
   useEffect(() => {
     const id = setInterval(() => {
-      setSecondsLeft((prev) => (prev <= 0 ? OVERPASS_INTERVAL_SECONDS : prev - 1))
-      if (Math.random() > 0.95) {
-        setSitesMonitored((prev) => prev + 1)
-      }
+      setSecondsLeft((prev) => (prev <= 0 ? NOAA20_ORBIT_SECONDS : prev - 1))
     }, 1000)
     return () => clearInterval(id)
   }, [])
@@ -42,11 +43,19 @@ export function TopNav() {
             Industrial Fire & Thermal Anomaly Monitoring
           </span>
         </div>
-        <div className="ml-2 flex items-center gap-1.5 border-l border-border/60 pl-3">
-          <Radio className="size-3 text-primary" strokeWidth={2} />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-primary glow-primary">
-            Live
-          </span>
+        <div className="ml-2 flex items-center gap-2 border-l border-border/60 pl-3">
+          <div className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-primary glow-primary">
+              Live Feed
+            </span>
+            <span className="font-mono text-[9px] text-muted-foreground">
+              SYNC: {summary?.lastUpdated ? formatTime(summary.lastUpdated) : "WAITING"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -60,20 +69,26 @@ export function TopNav() {
         </Link>
         <KpiCard
           icon={Activity}
-          label="Active Thermal Events"
-          value={activeEvents.toLocaleString()}
+          label="Active (12h)"
+          value={summary ? summary.totalDetections.toLocaleString() : "--"}
           tone="primary"
           active
         />
         <KpiCard
-          icon={ShieldAlert}
-          label="Industrial Sites Monitored"
-          value={sitesMonitored.toLocaleString()}
+          icon={Filter}
+          label="Routine Flares"
+          value={summary ? summary.routineFlares.toLocaleString() : "--"}
+          tone="neutral"
+        />
+        <KpiCard
+          icon={Target}
+          label="Avg Confidence"
+          value={summary ? `${summary.avgConfidence}%` : "--"}
           tone="neutral"
         />
         <KpiCard
           icon={Satellite}
-          label="Recent Satellite Pass"
+          label="NOAA-20 Orbit"
           value={formatCountdown(secondsLeft)}
           tone={imminent ? "destructive" : "primary"}
           active={imminent}

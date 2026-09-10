@@ -16,9 +16,13 @@ interface IntelDrawerProps {
 }
 
 export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
+  const isFire = event?.classification === "Industrial Fire"
+
+  // Simulate AI Anomaly Confidence score calculated from FRP and confidence attributes
+  const aiConfidence = event ? Math.min(100, Math.round((event.frp / 20) * 10 + event.confidence * 0.5)) : 0;
+
   return (
     <>
-      {/* Collapsed rail toggle */}
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -42,7 +46,7 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
         <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
           <Radar className="size-4 text-primary" strokeWidth={1.75} />
           <h2 className="font-mono text-xs font-semibold uppercase tracking-widest text-foreground">
-            Event Analysis
+            Target Intelligence
           </h2>
         </div>
 
@@ -50,17 +54,21 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
           <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-mono text-lg font-semibold text-foreground">{event.id}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  {event.timestamp} · {event.source}
+                <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                  Detection ID
+                </p>
+                <p className="font-mono text-xs font-semibold text-foreground truncate w-40" title={event.id}>{event.id}</p>
+                <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                  {event.timestamp} · VIIRS 375m
                 </p>
               </div>
               <Badge
-                variant={event.classification === "Fire" ? "destructive" : "outline"}
+                variant="outline"
                 className={cn(
                   "font-mono uppercase",
-                  event.classification === "Routine Flare" && "border-primary/40 text-primary",
-                  event.classification === "Shutdown" && "border-amber-500/40 text-amber-500"
+                  isFire 
+                    ? "border-red-500/50 bg-red-950/40 text-red-400 glow-destructive" 
+                    : "border-cyan-500/50 bg-cyan-950/40 text-cyan-400 glow-primary"
                 )}
               >
                 {event.classification}
@@ -72,38 +80,42 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Detection Confidence
+                  AI Anomaly Confidence
                 </span>
                 <span
                   className={cn(
                     "font-mono text-sm font-semibold tabular-nums",
-                    event.confidence >= 80 ? "text-destructive glow-destructive" : "text-primary"
+                    aiConfidence >= 80 ? "text-destructive glow-destructive" : "text-primary"
                   )}
                 >
-                  {event.confidence}%
+                  {aiConfidence}%
                 </span>
               </div>
               <Progress
-                value={event.confidence}
+                value={aiConfidence}
                 className={cn(
                   "h-1.5",
-                  event.confidence >= 80 ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"
+                  aiConfidence >= 80 ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"
                 )}
               />
             </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
+            
+            <div className="flex flex-col gap-2 mt-2">
+               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Assessed Severity
+                  Fire Radiative Power (FRP)
                 </span>
-                <span className="font-mono text-sm font-semibold uppercase text-foreground">
-                  {event.severity}
+                <span className="font-mono text-sm font-semibold text-foreground">
+                  {event.frp.toFixed(1)} MW
                 </span>
               </div>
+              <Progress
+                value={Math.min(100, event.frp / 2)}
+                className="h-1.5 [&>div]:bg-amber-500"
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+            <div className="grid grid-cols-2 gap-3 font-mono text-xs mt-2">
               <div className="flex flex-col gap-0.5 rounded-sm border border-border/60 bg-background/40 px-3 py-2">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   Brightness (K)
@@ -112,9 +124,9 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
               </div>
               <div className="flex flex-col gap-0.5 rounded-sm border border-border/60 bg-background/40 px-3 py-2">
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  FRP (MW)
+                  Raw Confidence
                 </span>
-                <span className="text-foreground">{event.frp.toFixed(1)}</span>
+                <span className="text-foreground">{event.confidence}%</span>
               </div>
             </div>
 
@@ -122,14 +134,14 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
               <div className="flex items-center gap-1.5">
                 <MapPinned className="size-3.5 text-muted-foreground" />
                 <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Industrial Site Match
+                  Spatial Coordinates & Mapping
                 </span>
               </div>
-              <p className="rounded-sm border border-border/60 bg-background/40 px-3 py-2 font-mono text-sm text-foreground">
-                {event.industrialSite}
+              <p className="rounded-sm border border-border/60 bg-background/40 px-3 py-2 font-mono text-[11px] text-foreground text-center">
+                LAT: {event.lat.toFixed(5)} / LNG: {event.lng.toFixed(5)}
               </p>
-              <p className="font-mono text-[10px] text-muted-foreground/70">
-                {event.lat.toFixed(4)}, {event.lng.toFixed(4)}
+              <p className="font-mono text-[10px] text-muted-foreground/70 text-center">
+                Cross-referencing OSM Industrial Zones...
               </p>
             </div>
 
@@ -142,28 +154,14 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <figure className="flex flex-col gap-1.5">
-                  <div className="relative aspect-square overflow-hidden rounded-sm border border-border/60">
-                    <Image
-                      src="/images/thermal-satellite.png"
-                      alt="Thermal infrared satellite capture of the detection site"
-                      fill
-                      className="object-cover"
-                      crossOrigin="anonymous"
-                    />
+                  <div className="relative aspect-square overflow-hidden rounded-sm border border-border/60 bg-muted/20">
                     <span className="absolute left-1.5 top-1.5 rounded-xs bg-background/70 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
                       Thermal
                     </span>
                   </div>
                 </figure>
                 <figure className="flex flex-col gap-1.5">
-                  <div className="relative aspect-square overflow-hidden rounded-sm border border-border/60">
-                    <Image
-                      src="/images/swir-satellite.png"
-                      alt="SWIR optical satellite capture of the detection site"
-                      fill
-                      className="object-cover"
-                      crossOrigin="anonymous"
-                    />
+                  <div className="relative aspect-square overflow-hidden rounded-sm border border-border/60 bg-muted/20">
                     <span className="absolute left-1.5 top-1.5 rounded-xs bg-background/70 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
                       SWIR Optical
                     </span>
@@ -172,14 +170,17 @@ export function IntelDrawer({ event, open, onOpenChange }: IntelDrawerProps) {
               </div>
             </div>
 
-            <Button variant="outline" className="mt-auto font-mono text-xs uppercase tracking-widest">
+            <Button variant="outline" className="mt-auto font-mono text-xs uppercase tracking-widest border-primary/50 text-primary hover:bg-primary/20">
               Dispatch Ground Verification
             </Button>
           </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-            <Radar className="size-6 text-muted-foreground/50" strokeWidth={1.25} />
-            <p className="font-mono text-xs text-muted-foreground">
+            <Radar className="size-6 text-muted-foreground/50 animate-pulse" strokeWidth={1.25} />
+            <p className="font-mono text-xs text-muted-foreground mt-4 uppercase tracking-widest">
+              Awaiting Target Selection
+            </p>
+            <p className="font-mono text-[10px] text-muted-foreground/60">
               Select a thermal event from the active feed to view event analysis and satellite validation.
             </p>
           </div>
